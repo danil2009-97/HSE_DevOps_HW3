@@ -117,9 +117,58 @@ resource "aws_db_instance" "default" {
   parameter_group_name = "default.mysql5.7"
 }
 
+
+### API CREATION
+
+resource "aws_api_gateway_rest_api" "api" {
+  name = "mysimpleAPI"
+  description = "Simple API using AWS Lambda"
+}
+
+resource "aws_api_gateway_resource" "MyResource" {
+  rest_api_id = aws_api_gateway_rest_api.api.id
+  parent_id = aws_api_gateway_rest_api.api.root_resource_id
+  path_part = "my-api"
+}
+
+resource "aws_api_gateway_method" "MyMethod" {
+  rest_api_id = aws_api_gateway_rest_api.api.id
+  resource_id = aws_api_gateway_resource.MyResource.id
+  http_method = "GET"
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_integration" "MyIntegration" {
+  rest_api_id = aws_api_gateway_rest_api.api.id
+  resource_id = aws_api_gateway_resource.MyResource.id
+  http_method = aws_api_gateway_method.MyMethod.http_method
+  integration_http_method = "GET"
+  type = "HTTP_PROXY"
+  uri = "https://k3gobxbe80.execute-api.us-east-2.amazonaws.com/my-api"
+}
+
+resource "aws_api_gateway_deployment" "MyDeployment" {
+
+  depends_on = [aws_api_gateway_integration.MyIntegration]
+
+
+  rest_api_id = aws_api_gateway_rest_api.api.id
+  stage_name = "dev"
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+
 output "db_instance_endpoint"  {
   value = aws_db_instance.default.endpoint
   description = "DB instance endpoint example output:"
+}
+
+output "api_gateway_url" {
+  value = "${aws_api_gateway_deployment.MyDeployment.invoke_url}/${aws_api_gateway_resource.MyResource.path_part}"
+  description = "This is my API URL"
 }
 
 
